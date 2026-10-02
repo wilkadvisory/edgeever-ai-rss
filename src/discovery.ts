@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { normalizePublicFeedUrl } from "./subscriptions";
 import type { PluginContext } from "./edgeever";
+import { t } from "./i18n";
 
 export const COMMUNITY_DIRECTORY_URL = "https://raw.githubusercontent.com/timqian/chinese-independent-blogs/master/feed.opml";
 
@@ -33,8 +34,8 @@ export const parseCommunityDirectory = (xml: string): DirectorySource[] => {
 
 export const fetchCommunityDirectory = async (context: PluginContext): Promise<DirectorySource[]> => {
   const response = await context.network.fetch(COMMUNITY_DIRECTORY_URL, { method: "GET", transport: "public" });
-  if (!response.ok) throw new Error(`目录读取失败：HTTP ${response.status}`);
+  if (!response.ok) throw new Error(t("error.directoryHttp", { status: response.status }));
   const xml = await response.text();
-  if (xml.length > 500_000) throw new Error("目录文件过大。");
+  if (xml.length > 500_000) throw new Error(t("error.directoryTooLarge"));
   return parseCommunityDirectory(xml);
 };

@@ -24,7 +24,7 @@ describe("digest settings", () => {
   });
 
   test("uses safe runtime fallbacks when settings are absent", () => {
-    const preferences = resolveReaderPreferences({});
+    const preferences = resolveReaderPreferences({}, "zh-CN");
     expect(preferences.selectedCategoryIds).toEqual([]);
     expect(preferences.digestWindowHours).toBe(24);
     expect(preferences.digestMaxArticles).toBe(20);
@@ -32,5 +32,20 @@ describe("digest settings", () => {
     expect(preferences.translationTarget).toBe("zh-CN");
     expect(preferences.autoDigest).toBe(false);
     expect(preferences.digestGenerationTime).toBe("08:00");
+  });
+
+  test("follows the interface language until a target language is chosen", () => {
+    for (const [hostLanguage, expected] of [
+      ["en-US", "en"],
+      ["zh-CN", "zh-CN"],
+      ["zh-TW", "zh-TW"],
+      ["ja", "ja"],
+      ["ko-KR", "ko"],
+      ["fr-FR", "en"],
+    ] as const) {
+      expect(resolveReaderPreferences({}, hostLanguage).translationTarget).toBe(expected);
+      expect(resolveReaderPreferences({ "translation.target-language": "auto" }, hostLanguage).translationTarget).toBe(expected);
+    }
+    expect(resolveReaderPreferences({ "translation.target-language": "zh-CN" }, "en-US").translationTarget).toBe("zh-CN");
   });
 });

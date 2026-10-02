@@ -106,6 +106,35 @@ describe("category digest", () => {
     expect(cleaned).toContain("## 01 | 重要更新");
   });
 
+  test("builds an English note when the digest language is English", () => {
+    const category = CATEGORIES[0]!;
+    const related = {
+      articleId: "related",
+      sourceId: "related-source",
+      sourceName: "Related",
+      title: "Related story",
+      url: "https://related.example.com/story",
+      publishedAt: null,
+    };
+    expect(digestTitle("2026-09-08", "AI Frontiers", "en")).toBe("2026-09-08 · AI Frontiers · RSS Digest");
+    const markdown = buildDigestMarkdown({
+      title: "2026-09-08 · AI Frontiers · RSS Digest",
+      category,
+      generatedAt: new Date("2026-09-08T12:00:00.000Z"),
+      articles: [article({ relatedCoverage: [related] }), article({ id: "article-2" })],
+      aiMarkdown: "## 01 | Major update\n\n- **Key development**: A point.〔2〕\n\n> 🔗 **Sources**: 〔1〕〔2〕",
+      windowHours: 48,
+      language: "en",
+    });
+    expect(markdown).toStartWith("> 📅 **2026-09-08** · 🏷️ **AI Frontiers** · ⏱️ **2 selected articles** (last 48 hours) · generated ");
+    expect(markdown).toContain("A point. [OpenAI News](<https://example.com/update>)");
+    expect(markdown).toContain("> 🔗 **Sources**: [OpenAI News](<https://example.com/update>) · [Also covered · Related](<https://related.example.com/story>) · [OpenAI News]");
+    expect(markdown).not.toMatch(/[\u4e00-\u9fff]/);
+
+    const cleaned = renderDigestBody("> 💡 **Today at a glance**: Industry news.\n\n---\n\n## 01 | Major update", [article()], "en");
+    expect(cleaned).toBe("## 01 | Major update");
+  });
+
   test("renders valid citations with corroborating sources and leaves invalid ones unchanged", () => {
     const markdown = renderDigestBody("## 01 | 模型能力升级\n\n热点〔1〕〔1〕，标点。〔1〕，无效〔2〕。", [article({
       sourceName: "Source [one]",

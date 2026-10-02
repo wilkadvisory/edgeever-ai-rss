@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-10-02
+
+- 界面语言跟随 EdgeEver「通用 → 界面语言」：设置页、命令、订阅面板、提示和错误信息提供简体中文、英语和日语，其他界面语言回退到英语；运行中切换界面语言无需重新加载插件。
+- 「翻译目标语言」更名为「日报与翻译语言」，新增默认选项「跟随界面语言」。日报笔记的标题、主题名、元信息、信源标签以及 AI 写作语言均随该设置变化，支持简体中文、繁体中文、英语、日语和韩语；简体中文的提示词与输出保持不变。已明确选择过语言的用户不受影响。
+- 设置页以英语作为回退文案，并通过 `locales` 提供简体中文和日语；主题信源列表改用宿主提供的本地化入口文案。
+- The interface now follows EdgeEver's General → Interface language setting: settings, commands, the subscription panel, notices, and errors ship in Simplified Chinese, English, and Japanese, and other interface languages fall back to English. Switching the interface language while the plugin is running needs no reload.
+- Rename "Translation target language" to "Digest and translation language" and add a default "Follow interface language" option. The saved digest's title, topic name, metadata line, source labels, and AI writing language all follow this setting, in Simplified Chinese, Traditional Chinese, English, Japanese, or Korean. The Simplified Chinese prompt and output are unchanged, and users who already chose a language keep it.
+- Setting copy now falls back to English with Simplified Chinese and Japanese supplied through `locales`; topic source lists use the host's localized entry label.
+
 ## 0.6.3 — 2026-10-02
 
 - 移除分类日报生成结果弹窗，避免成功或部分订阅源读取失败时打断阅读。

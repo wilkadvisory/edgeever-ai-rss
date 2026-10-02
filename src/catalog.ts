@@ -148,9 +148,9 @@ export const resolveFeedUrls = (source: FeedSource): string[] => {
 export const topicSourceList = (categoryId: string) => {
   const category = CATEGORIES.find((candidate) => candidate.id === categoryId);
   if (!category) throw new Error(`Unknown feed category: ${categoryId}`);
+  // No title or actionLabel: setting lists cannot be localized per field yet, so the
+  // host falls back to the localized field label and its own translated entry label.
   return {
-    title: `${category.name}信源`,
-    actionLabel: "查看信源",
     items: FEEDS.filter((feed) => feed.categoryId === category.id && !feed.optional).map((feed) => ({
       title: feed.name,
       description: feedSiteHost(feed.siteUrl),

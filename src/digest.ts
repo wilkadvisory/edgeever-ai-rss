@@ -1,6 +1,14 @@
 import type { FeedCategory } from "./catalog";
 import { articleFreshness, clusterRelatedArticles } from "./dedupe";
 import type { Article } from "./feed";
+import {
+  digestCategoryName,
+  digestCorroborationLabel,
+  digestMetaText,
+  digestTitleText,
+  LEGACY_OVERVIEW_LABELS,
+} from "./i18n";
+import type { DigestLanguage } from "./i18n";
 
 export const DAILY_DIGEST_TAG = "AI-RSS-Daily";
 export const DAILY_DIGEST_WINDOW_MS = 24 * 60 * 60 * 1_000;
@@ -13,8 +21,8 @@ export const digestDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const digestTitle = (dateKey: string, categoryName: string): string =>
-  `${dateKey} · ${categoryName} · RSS 日报`;
+export const digestTitle = (dateKey: string, categoryName: string, language: DigestLanguage = "zh-CN"): string =>
+  digestTitleText(dateKey, categoryName, language);
 
 export const digestTags = (dateKey: string, categoryId: string): string[] => [
   "RSS",
@@ -85,23 +93,31 @@ const markdownEscape = (value: string): string => value.replace(/([\\`*_{}\[\]()
 
 const markdownUrl = (value: string): string => value.replace(/</g, "%3C").replace(/>/g, "%3E");
 
-const sourceLinks = (article: Article): string => [
+const sourceLinks = (article: Article, language: DigestLanguage): string => [
   `[${markdownEscape(article.sourceName)}](<${markdownUrl(article.url)}>)`,
   ...(article.relatedCoverage ?? []).map((coverage) =>
-    `[佐证 · ${markdownEscape(coverage.sourceName)}](<${markdownUrl(coverage.url)}>)`,
+    `[${digestCorroborationLabel(language)} · ${markdownEscape(coverage.sourceName)}](<${markdownUrl(coverage.url)}>)`,
   ),
 ].join(" · ");
 
-export const renderDigestBody = (markdown: string, articles: Article[]): string => {
+const regexEscape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Older or cached model output may still open with the retired overview block.
+const LEGACY_OVERVIEW_BLOCK = new RegExp(
+  `^>\\s*💡\\s*\\*\\*?(?:${LEGACY_OVERVIEW_LABELS.map(regexEscape).join("|")})\\*?\\*?.*?(?:\\n\\s*---\\s*(?:\\n|$)|(?=\\n\\s*##\\s*\\d+))`,
+  "is",
+);
+
+export const renderDigestBody = (markdown: string, articles: Article[], language: DigestLanguage = "zh-CN"): string => {
   const stripped = markdown
-    .replace(/^>\s*💡\s*\*\*?今日速览\*?\*?.*?(?:\n\s*---\s*(?:\n|$)|(?=\n\s*##\s*\d+))/s, "")
+    .replace(LEGACY_OVERVIEW_BLOCK, "")
     .trimStart();
   const normalized = stripped
     .replace(/(〔\d+〕)\s*(?=〔\d+〕)/g, "$1 · ")
-    .replace(/([。！？；])\s*(?=〔\d+〕)/g, "$1 ");
+    .replace(/([。！？；.!?;])\s*(?=〔\d+〕)/g, "$1 ");
   return normalized.replace(/〔(\d+)〕/g, (citation, rawIndex: string) => {
     const article = articles[Number(rawIndex) - 1];
-    return article ? sourceLinks(article) : citation;
+    return article ? sourceLinks(article, language) : citation;
   });
 };
 
@@ -126,12 +142,19 @@ export const buildDigestMarkdown = (input: {
   articles: Article[];
   aiMarkdown: string;
   windowHours?: number;
+  /** Language of the saved note. Defaults to Simplified Chinese, the original behavior. */
+  language?: DigestLanguage;
 }): string => {
-  const dateKey = digestDateKey(input.generatedAt);
-  const time = formatDigestTime(input.generatedAt);
-  const meta = `> 📅 **${dateKey}** ｜ 🏷️ **${markdownEscape(input.category.name)}** ｜ ⏱️ **${input.articles.length} 篇精选**（最近 ${input.windowHours ?? 24} 小时）· ${time} 生成`;
+  const language = input.language ?? "zh-CN";
+  const meta = digestMetaText({
+    dateKey: digestDateKey(input.generatedAt),
+    categoryName: markdownEscape(digestCategoryName(input.category.id, language, input.category.name)),
+    count: input.articles.length,
+    hours: input.windowHours ?? 24,
+    time: formatDigestTime(input.generatedAt),
+  }, language);
   return [
     meta,
-    renderDigestBody(input.aiMarkdown.trim(), input.articles),
+    renderDigestBody(input.aiMarkdown.trim(), input.articles, language),
   ].join("\n\n");
 };

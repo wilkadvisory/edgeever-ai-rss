@@ -3,6 +3,7 @@ import { COMMUNITY_DIRECTORY } from "./community-directory";
 import { fetchCommunityDirectory, type DirectorySource } from "./discovery";
 import type { PluginContext } from "./edgeever";
 import { fetchFeed } from "./feed";
+import { t, uiCategoryName } from "./i18n";
 import { createPersonalSource, loadSubscriptions, MAX_PERSONAL_SOURCES, saveSubscriptions, type PersonalSource, type Subscriptions } from "./subscriptions";
 
 const PANEL_ID = "explore-subscriptions";
@@ -26,7 +27,7 @@ const button = (label: string, click: () => void, disabled = false): HTMLButtonE
 export const registerSubscriptionPanel = (context: PluginContext): (() => void) => {
   const disposePanel = context.ui.panels.register({
     id: PANEL_ID,
-    title: "探索 RSS 订阅",
+    title: t("panel.title"),
     purpose: "workflow",
     presentation: "fullscreen",
     async mount(container, panel) {
@@ -45,14 +46,14 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
       let customLanguage: "zh" | "en" = "zh";
 
       const syncChrome = () => panel.shell.set({
-        header: { title: "探索 RSS 订阅", description: "精选源、中文独立博客与我的订阅" },
+        header: { title: t("panel.title"), description: t("panel.description") },
         toolbar: [
           { type: "tabs", key: "tab", value: tab, options: [
-            { value: "featured", label: "精选" },
-            { value: "community", label: "中文独立博客" },
-            { value: "personal", label: "我的订阅" },
+            { value: "featured", label: t("tab.featured") },
+            { value: "community", label: t("tab.community") },
+            { value: "personal", label: t("tab.personal") },
           ] },
-          { type: "search", key: "query", value: query, placeholder: "搜索名称或地址" },
+          { type: "search", key: "query", value: query, placeholder: t("search.placeholder") },
         ],
         onChange: (key, value) => {
           if (key === "tab" && (value === "featured" || value === "community" || value === "personal")) {
@@ -74,9 +75,9 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
         try {
           await saveSubscriptions(context, next);
           subscriptions = next;
-          message = "订阅已保存。下次生成日报时生效。";
+          message = t("message.saved");
         } catch (error) {
-          message = error instanceof Error ? error.message : "订阅保存失败。";
+          message = error instanceof Error ? error.message : t("message.saveFailed");
         } finally {
           busy = false;
           render();
@@ -89,9 +90,9 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
         render();
         try {
           directory = await fetchCommunityDirectory(context);
-          message = `已加载 ${directory.length} 个公开 HTTPS 博客源。`;
+          message = t("message.directoryLoaded", { count: directory.length });
         } catch (error) {
-          message = error instanceof Error ? error.message : "目录读取失败。";
+          message = error instanceof Error ? error.message : t("message.directoryFailed");
         } finally {
           directoryLoading = false;
           render();
@@ -101,17 +102,17 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
       const subscribePersonal = async (source: PersonalSource) => {
         if (busy) return;
         if (subscriptions.personal.length >= MAX_PERSONAL_SOURCES) {
-          message = `最多订阅 ${MAX_PERSONAL_SOURCES} 个个人源。`;
+          message = t("message.personalLimit", { max: MAX_PERSONAL_SOURCES });
           render();
           return;
         }
         if (subscriptions.personal.some((item) => item.url === source.url) || FEEDS.some((item) => item.url === source.url)) {
-          message = "这个地址已订阅或已内置。";
+          message = t("message.duplicate");
           render();
           return;
         }
         busy = true;
-        message = `正在验证 ${source.name}…`;
+        message = t("message.verifying", { name: source.name });
         render();
         try {
           await fetchFeed(context, { ...source, siteUrl: new URL(source.url).origin });
@@ -119,9 +120,9 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
           subscriptions = await loadSubscriptions(context);
           customUrl = "";
           customName = "";
-          message = `已订阅 ${source.name}。请在插件设置中启用对应主题，之后生成日报时生效。`;
+          message = t("message.subscribed", { name: source.name });
         } catch (error) {
-          message = error instanceof Error ? error.message : "订阅源验证失败。";
+          message = error instanceof Error ? error.message : t("message.verifyFailed");
         } finally {
           busy = false;
           render();
@@ -140,12 +141,12 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
 
       const renderFeatured = (root: HTMLElement) => {
         const feeds = FEEDS.filter((feed) => feed.optional && matches(feed.name, feed.url));
-        root.append(element("p", "edgeever-rss-muted", "这些精选源经独立验证，默认关闭。选中后仍需启用对应主题。"));
-        if (!feeds.length) root.append(element("p", "edgeever-rss-muted", "没有匹配的精选源。"));
+        root.append(element("p", "edgeever-rss-muted", t("featured.intro")));
+        if (!feeds.length) root.append(element("p", "edgeever-rss-muted", t("featured.empty")));
         for (const feed of feeds) {
           const selected = subscriptions.featuredIds.includes(feed.id);
-          const category = CATEGORIES.find((item) => item.id === feed.categoryId)?.name ?? feed.categoryId;
-          root.append(sourceRow(feed.name, feed.url, `${category} · ${new URL(feed.siteUrl).hostname}`, selected ? "取消订阅" : "订阅", () => {
+          const category = uiCategoryName(feed.categoryId, CATEGORIES.find((item) => item.id === feed.categoryId)?.name);
+          root.append(sourceRow(feed.name, feed.url, `${category} · ${new URL(feed.siteUrl).hostname}`, selected ? t("action.unsubscribe") : t("action.subscribe"), () => {
             void save({ ...subscriptions, featuredIds: selected
               ? subscriptions.featuredIds.filter((id) => id !== feed.id)
               : [...subscriptions.featuredIds, feed.id] });
@@ -154,18 +155,18 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
       };
 
       const renderCommunity = (root: HTMLElement) => {
-        root.append(element("p", "edgeever-rss-muted", `内置 ${COMMUNITY_DIRECTORY.length} 个公开 HTTPS 博客源，可离线搜索。目录来源：timqian/chinese-independent-blogs（MIT）；旧地址可能失效，订阅时只验证所选源。`));
-        root.append(button(directoryLoading ? "正在更新…" : "更新目录", () => void loadDirectory(), directoryLoading));
+        root.append(element("p", "edgeever-rss-muted", t("community.intro", { count: COMMUNITY_DIRECTORY.length })));
+        root.append(button(directoryLoading ? t("community.refreshing") : t("community.refresh"), () => void loadDirectory(), directoryLoading));
         const feeds = directory.filter((source) => matches(source.name, source.url));
-        root.append(element("p", "edgeever-rss-muted", `匹配 ${feeds.length} 个，当前显示 ${Math.min(shown, feeds.length)} 个。`));
+        root.append(element("p", "edgeever-rss-muted", t("community.count", { matched: feeds.length, shown: Math.min(shown, feeds.length) })));
         for (const source of feeds.slice(0, shown)) {
           const selected = subscriptions.personal.some((item) => item.url === source.url) || FEEDS.some((item) => item.url === source.url);
-          root.append(sourceRow(source.name, source.url, source.siteUrl ?? new URL(source.url).hostname, selected ? "已订阅" : "订阅到中文阅读", () => {
+          root.append(sourceRow(source.name, source.url, source.siteUrl ?? new URL(source.url).hostname, selected ? t("action.subscribed") : t("action.subscribeChinese"), () => {
             const personal = createPersonalSource(source.url, source.name, "chinese", "zh");
             if (personal) void subscribePersonal(personal);
           }, selected));
         }
-        if (shown < feeds.length) root.append(button("显示更多", () => { shown += 50; render(); }));
+        if (shown < feeds.length) root.append(button(t("action.showMore"), () => { shown += 50; render(); }));
       };
 
       const renderPersonal = (root: HTMLElement) => {
@@ -174,27 +175,27 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
         url.type = "url";
         url.placeholder = "https://example.com/feed.xml";
         url.value = customUrl;
-        url.setAttribute("aria-label", "RSS 或 Atom 地址");
+        url.setAttribute("aria-label", t("personal.urlLabel"));
         url.addEventListener("input", () => { customUrl = url.value; });
         const name = element("input", "edgeever-rss-input");
         name.type = "text";
-        name.placeholder = "名称（可选）";
+        name.placeholder = t("personal.namePlaceholder");
         name.value = customName;
-        name.setAttribute("aria-label", "订阅名称");
+        name.setAttribute("aria-label", t("personal.nameLabel"));
         name.addEventListener("input", () => { customName = name.value; });
         const category = element("select", "edgeever-rss-input");
-        category.setAttribute("aria-label", "日报主题");
+        category.setAttribute("aria-label", t("personal.topicLabel"));
         for (const item of CATEGORIES) {
           const option = element("option");
           option.value = item.id;
-          option.textContent = item.name;
+          option.textContent = uiCategoryName(item.id, item.name);
           category.append(option);
         }
         category.value = customCategory;
         category.addEventListener("change", () => { customCategory = category.value; });
         const language = element("select", "edgeever-rss-input");
-        language.setAttribute("aria-label", "内容语言");
-        for (const [value, label] of [["zh", "中文"], ["en", "英语"]] as const) {
+        language.setAttribute("aria-label", t("personal.languageLabel"));
+        for (const [value, label] of [["zh", t("language.zh")], ["en", t("language.en")]] as const) {
           const option = element("option");
           option.value = value;
           option.textContent = label;
@@ -202,25 +203,25 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
         }
         language.value = customLanguage;
         language.addEventListener("change", () => { customLanguage = language.value === "en" ? "en" : "zh"; });
-        const submit = button("添加订阅", () => undefined, busy);
+        const submit = button(t("action.add"), () => undefined, busy);
         submit.type = "submit";
         form.append(url, name, category, language, submit);
         form.addEventListener("submit", (event) => {
           event.preventDefault();
           const source = createPersonalSource(customUrl, customName, customCategory, customLanguage);
           if (!source) {
-            message = "请输入公开 HTTPS RSS / Atom 地址，并选择有效主题。";
+            message = t("personal.invalid");
             render();
             return;
           }
           void subscribePersonal(source);
         });
-        root.append(form, element("p", "edgeever-rss-muted", `已添加 ${subscriptions.personal.length}/${MAX_PERSONAL_SOURCES} 个个人源。只读取公开源，不支持账号、令牌或本地网络。`));
+        root.append(form, element("p", "edgeever-rss-muted", t("personal.count", { count: subscriptions.personal.length, max: MAX_PERSONAL_SOURCES })));
         const sources = subscriptions.personal.filter((source) => matches(source.name, source.url));
-        if (!sources.length) root.append(element("p", "edgeever-rss-muted", "没有匹配的个人订阅。"));
+        if (!sources.length) root.append(element("p", "edgeever-rss-muted", t("personal.empty")));
         for (const source of sources) {
-          const topic = CATEGORIES.find((item) => item.id === source.categoryId)?.name ?? source.categoryId;
-          root.append(sourceRow(source.name, source.url, `${topic} · ${source.url}`, "取消订阅", () => {
+          const topic = uiCategoryName(source.categoryId, CATEGORIES.find((item) => item.id === source.categoryId)?.name);
+          root.append(sourceRow(source.name, source.url, `${topic} · ${source.url}`, t("action.unsubscribe"), () => {
             void save({ ...subscriptions, personal: subscriptions.personal.filter((item) => item.id !== source.id) });
           }));
         }
@@ -242,7 +243,7 @@ export const registerSubscriptionPanel = (context: PluginContext): (() => void) 
   });
   const disposeCommand = context.commands.register({
     id: PANEL_ID,
-    title: "探索和管理 RSS 订阅",
+    title: t("command.manage"),
     run: () => context.ui.panels.open(PANEL_ID),
   });
   return () => { disposeCommand(); disposePanel(); };
